@@ -1,34 +1,64 @@
 #!/usr/bin/env python3
 """
-EuroPulse - Environment Test Script
-Validates that Python and basic dependencies are working
+EuroPulse - Fixed Environment Test Script
 """
 
 import sys
 import platform
 
+def check_package(package_name):
+    """Check if a package is installed and return version"""
+    try:
+        if package_name == 'scikit-learn':
+            import sklearn
+            return True, sklearn.__version__
+        elif package_name == 'python-dotenv':
+            import dotenv
+            return True, dotenv.__version__
+        else:
+            module = __import__(package_name)
+            if hasattr(module, '__version__'):
+                return True, module.__version__
+            else:
+                return True, "version unknown"
+    except ImportError as e:
+        return False, f"Import error: {e}"
+    except Exception as e:
+        return False, f"Error: {e}"
+
 def check_environment():
-    print("🔧 EuroPulse - Environment Check")
-    print("=" * 40)
+    print("🔧 EuroPulse - Fixed Environment Check")
+    print("=" * 50)
     
-    # Python version check
+    # Python version
     python_version = platform.python_version()
     print(f"✅ Python Version: {python_version}")
     
     # Check critical packages
-    required_packages = ['requests', 'numpy', 'pandas']
+    required_packages = {
+        'pandas': 'Data analysis',
+        'numpy': 'Numerical computing', 
+        'requests': 'API calls',
+        'dotenv': 'Environment variables',  # Note: import name is dotenv
+        'sklearn': 'Machine learning'       # Note: import name is sklearn
+    }
     
-    for package in required_packages:
-        try:
-            __import__(package)
-            print(f"✅ {package:15} - OK")
-        except ImportError:
-            print(f"❌ {package:15} - MISSING")
+    all_ok = True
+    for package, description in required_packages.items():
+        installed, version = check_package(package)
+        if installed:
+            print(f"✅ {package:15} {str(version):15} - {description}")
+        else:
+            print(f"❌ {package:15} {'MISSING':15} - {description}")
+            all_ok = False
     
-    print("\n🎯 Next steps:")
-    print("1. Run: git init")
-    print("2. Create requirements.txt")
-    print("3. Initial commit & GitHub setup")
+    print("\n" + "=" * 50)
+    if all_ok:
+        print("🎉 All dependencies installed! Ready to build EuroPulse.")
+    else:
+        print("⚠️  There might be import issues. Let's debug...")
+    
+    return all_ok
 
 if __name__ == "__main__":
     check_environment()
