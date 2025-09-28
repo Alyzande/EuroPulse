@@ -6,9 +6,9 @@ Simulates social media posts about physical danger events in French/German
 import time
 import random
 from typing import List, Dict, Any
-from processing.text_cleaner import TextCleaner
-from processing.location_extractor import LocationExtractor
-from processing.threat_classifier import ThreatClassifier
+from src.processing.text_cleaner import TextCleaner
+from src.processing.location_extractor import LocationExtractor
+from src.processing.threat_classifier import ThreatClassifier
 
 
 class ThreatCollector:

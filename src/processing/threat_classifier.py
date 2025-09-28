@@ -3,7 +3,7 @@ Automatically classify threats based on keywords and content
 """
 
 import re
-from data.threat_keywords import THREAT_KEYWORDS, URGENCY_INDICATORS
+from src.data.threat_keywords import THREAT_KEYWORDS, URGENCY_INDICATORS
 
 class ThreatClassifier:
     """Classify threats based on keyword analysis"""

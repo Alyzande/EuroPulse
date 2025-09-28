@@ -3,9 +3,9 @@ Modular location extraction using separate data files
 """
 
 import re
-from data.locations.french_locations import FRENCH_HIGH_RISK_LOCATIONS
-from data.locations.german_locations import GERMAN_HIGH_RISK_LOCATIONS
-from data.locations.base_locations import HIGH_RISK_LOCATIONS
+from src.data.locations.french_locations import FRENCH_HIGH_RISK_LOCATIONS
+from src.data.locations.german_locations import GERMAN_HIGH_RISK_LOCATIONS  
+from src.data.locations.base_locations import HIGH_RISK_LOCATIONS
 
 class LocationExtractor:
     """Extract high-risk locations using modular data sources"""

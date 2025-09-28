@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EuroPulse - Real-Time Threat Detection</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #0f0f23;
+            color: #00ff00;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .card {
+            background: #1a1a2e;
+            border: 1px solid #00ff00;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 255, 0, 0.1);
+        }
+        .threat-list {
+            grid-column: 1 / -1;
+        }
+        .threat-item {
+            background: #16213e;
+            border-left: 4px solid #ff0000;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .critical { border-left-color: #ff0000; }
+        .high { border-left-color: #ff6b00; }
+        .medium { border-left-color: #ffd000; }
+        .low { border-left-color: #00ff00; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .stat-card {
+            background: #16213e;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .critical-alert {
+            border-left: 6px solid #ff0000 !important;
+            background: #330000 !important;
+            animation: pulse 2s infinite;
+        }
+        
+        .urgent {
+            border: 2px solid #ff6b00 !important;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+        
+        .threat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .risk-badge, .urgent-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        
+        .risk-badge { background: #444; }
+        .urgent-badge { background: #ff6b00; color: white; }
+        
+        .threat-text {
+            margin: 8px 0;
+            color: #cccccc;
+        }
+        
+        .threat-locations, .threat-response {
+            font-size: 0.9em;
+            color: #888888;
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚨 EuroPulse - Real-Time Threat Detection</h1>
+        <p>Monitoring French & German social media for physical threats</p>
+    </div>
+
+    <div class="dashboard">
+        <div class="card">
+            <h2>📊 Threat Statistics</h2>
+            <div class="stats-grid" id="stats-grid">
+                <!-- Stats will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🌍 Threat Map</h2>
+            <canvas id="threatChart" width="400" height="200"></canvas>
+        </div>
+
+        <div class="card threat-list">
+            <h2>🚨 CRITICAL ALERTS</h2>
+            <div id="critical-alerts">
+                <!-- Critical threats will go here -->
+            </div>
+            
+            <h2>⚠️ ACTIVE THREATS</h2>
+            <div id="active-threats">
+                <!-- Other threats will go here -->
+            </div>
+            
+            <h2>📋 ONGOING MONITORING</h2>
+            <div id="ongoing-threats">
+                <!-- Low-priority threats will go here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let threatChart;
+
+        async function updateDashboard() {
+            // Fetch current threats
+            const threatsResponse = await fetch('/api/threats');
+            const threatsData = await threatsResponse.json();
+            
+            // Fetch statistics
+            const statsResponse = await fetch('/api/stats');
+            const statsData = await statsResponse.json();
+            
+            updateStats(statsData);
+            updateThreatsList(threatsData.threats);
+            updateChart(statsData);
+        }
+
+        function updateStats(stats) {
+            const statsGrid = document.getElementById('stats-grid');
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <h3>Active Threats</h3>
+                    <div style="font-size: 2em; color: #ff0000;">${stats.total_threats}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>High/Critical</h3>
+                    <div style="font-size: 2em; color: #ff6b00;">${stats.risk_levels.high + stats.risk_levels.critical}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Countries</h3>
+                    <div style="font-size: 2em; color: #00ff00;">${Object.keys(stats.countries).length}</div>
+                </div>
+            `;
+        }
+
+        function updateThreatsList(threats) {
+            // Separate threats by priority
+            const criticalAlerts = threats.filter(t => 
+                t.threat_classification?.risk_level === 'critical' || 
+                (t.threat_classification?.risk_level === 'high' && t.threat_classification?.urgency_detected)
+            );
+            
+            const activeThreats = threats.filter(t => 
+                t.threat_classification?.risk_level === 'high' && 
+                !criticalAlerts.includes(t)
+            );
+            
+            const ongoingThreats = threats.filter(t => 
+                t.threat_classification?.risk_level === 'medium' || 
+                t.threat_classification?.risk_level === 'low'
+            );
+
+            updateThreatSection('critical-alerts', criticalAlerts, '🚨 CRITICAL ALERT - IMMEDIATE RESPONSE NEEDED');
+            updateThreatSection('active-threats', activeThreats, 'No high-priority threats');
+            updateThreatSection('ongoing-threats', ongoingThreats, 'No ongoing threats');
+        }
+
+        function updateThreatSection(sectionId, threats, emptyMessage) {
+            const section = document.getElementById(sectionId);
+            
+            if (threats.length === 0) {
+                section.innerHTML = `<div class="threat-item low">${emptyMessage}</div>`;
+                return;
+            }
+            
+            section.innerHTML = threats.map(threat => {
+                const classification = threat.threat_classification || {};
+                const riskLevel = classification.risk_level || 'low';
+                const locations = threat.locations || [];
+                const isUrgent = classification.urgency_detected;
+                const isCritical = riskLevel === 'critical' || (riskLevel === 'high' && isUrgent);
+                
+                return `
+                    <div class="threat-item ${riskLevel} ${isUrgent ? 'urgent' : ''} ${isCritical ? 'critical-alert' : ''}">
+                        <div class="threat-header">
+                            <strong>${classification.primary_threat || 'Unknown Threat'}</strong> 
+                            <span class="risk-badge">${riskLevel.toUpperCase()}</span>
+                            ${isUrgent ? '<span class="urgent-badge">⚡ URGENT</span>' : ''}
+                        </div>
+                        <div class="threat-text">${threat.text}</div>
+                        ${locations.length > 0 ? `
+                        <div class="threat-locations">
+                            📍 ${locations.map(l => `${l.name} (${l.city}, ${l.country})`).join(', ')}
+                        </div>
+                        ` : ''}
+                        <div class="threat-response">
+                            🚑 ${classification.response_needed || 'Monitoring'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateChart(stats) {
+            const ctx = document.getElementById('threatChart').getContext('2d');
+            
+            if (threatChart) {
+                threatChart.destroy();
+            }
+            
+            threatChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(stats.threat_types),
+                    datasets: [{
+                        data: Object.values(stats.threat_types),
+                        backgroundColor: ['#ff0000', '#ff6b00', '#ffd000', '#00ff00', '#007bff']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#00ff00'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update every 10 seconds
+        setInterval(updateDashboard, 10000);
+        updateDashboard(); // Initial load
+    </script>
+</body>
+</html>
