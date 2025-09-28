@@ -7,6 +7,8 @@ import time
 import random
 from typing import List, Dict, Any
 from processing.text_cleaner import TextCleaner
+from processing.location_extractor import LocationExtractor
+from processing.threat_classifier import ThreatClassifier
 
 
 class ThreatCollector:
@@ -19,6 +21,8 @@ class ThreatCollector:
         self.language = language
         self.threat_events = self._get_threat_events(language)
         self.text_cleaner = TextCleaner(language)
+        self.location_extractor = LocationExtractor(language)
+        self.threat_classifier = ThreatClassifier(language)
         print(f"🚨 Threat collector initialized for {language} language")
     
     def collect_recent_posts(self, limit: int = 25) -> List[Dict[str, Any]]:
@@ -56,6 +60,12 @@ class ThreatCollector:
                 'urgency': self._calculate_urgency(threat_level, post_text)
             }
             post['clean_text'] = self.text_cleaner.clean_text(post_text)
+
+                        # Extract locations from the original text
+            post['locations'] = self.location_extractor.extract_locations(post_text)
+            
+            # Classify threat based on content
+            post['threat_classification'] = self.threat_classifier.classify_threat(post_text)
 
             posts.append(post)
         
