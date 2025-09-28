@@ -30,10 +30,12 @@ def test_threat_detection():
     german_posts = de_threat.collect_recent_posts(limit=8)
     
     print("\nThreat Posts Found:")
-    for i, post in enumerate(german_posts):
+    for i, post in enumerate(french_posts):
         if post['threat_level'] != 'normal':
             print(f"  🔥 {post['threat_type']} - {post['threat_level']} urgency")
-            print(f"     {post['text']}")
+            print(f"     Original: {post['text']}")
+            print(f"     Cleaned:  {post.get('clean_text', 'Not cleaned')}")
 
 if __name__ == "__main__":
     test_threat_detection()
+

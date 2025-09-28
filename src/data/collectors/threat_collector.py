@@ -6,6 +6,7 @@ Simulates social media posts about physical danger events in French/German
 import time
 import random
 from typing import List, Dict, Any
+from processing.text_cleaner import TextCleaner
 
 
 class ThreatCollector:
@@ -17,6 +18,7 @@ class ThreatCollector:
     def __init__(self, language: str = 'fr'):
         self.language = language
         self.threat_events = self._get_threat_events(language)
+        self.text_cleaner = TextCleaner(language)
         print(f"🚨 Threat collector initialized for {language} language")
     
     def collect_recent_posts(self, limit: int = 25) -> List[Dict[str, Any]]:
@@ -53,7 +55,8 @@ class ThreatCollector:
                 'threat_level': threat_level,
                 'urgency': self._calculate_urgency(threat_level, post_text)
             }
-            
+            post['clean_text'] = self.text_cleaner.clean_text(post_text)
+
             posts.append(post)
         
         print(f"📊 Collected {len(posts)} posts - {sum(1 for p in posts if p['threat_level'] != 'normal')} threat-related")
