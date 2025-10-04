@@ -176,5 +176,95 @@
         setInterval(updateDashboard, 10000);
         updateDashboard(); // Initial load
     </script>
+
+
+    <!-- Debug Section - Raw Reddit Data -->
+    <div class="card" style="margin-top: 20px;">
+        <h2 onclick="toggleDebug()" style="cursor: pointer; color: #888;">🔍 Debug: Raw Reddit Posts (Click to Show)</h2>
+        <div id="debug-section" style="display: none;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>French Posts</h3>
+                    <div id="debug-fr-count">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>German Posts</h3>
+                    <div id="debug-de-count">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Raw</h3>
+                    <div id="debug-total-count">0</div>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                <div>
+                    <h4>🇫🇷 French Posts</h4>
+                    <div id="debug-french-posts" style="max-height: 400px; overflow-y: auto;"></div>
+                </div>
+                <div>
+                    <h4>🇩🇪 German Posts</h4>
+                    <div id="debug-german-posts" style="max-height: 400px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleDebug() {
+            const debugSection = document.getElementById('debug-section');
+            debugSection.style.display = debugSection.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function updateDebugData(threats) {
+            // Separate posts by language and platform
+            const frenchPosts = threats.filter(t => t.language === 'fr' && t.platform === 'reddit');
+            const germanPosts = threats.filter(t => t.language === 'de' && t.platform === 'reddit');
+            
+            // Update counts
+            document.getElementById('debug-fr-count').textContent = frenchPosts.length;
+            document.getElementById('debug-de-count').textContent = germanPosts.length;
+            document.getElementById('debug-total-count').textContent = frenchPosts.length + germanPosts.length;
+            
+            // Display French posts
+            const frenchContainer = document.getElementById('debug-french-posts');
+            frenchContainer.innerHTML = frenchPosts.map(post => `
+                <div class="threat-item low" style="margin: 10px 0; padding: 10px; font-size: 0.9em;">
+                    <div><strong>r/${post.subreddit}</strong> - ${new Date(post.timestamp * 1000).toLocaleTimeString()}</div>
+                    <div style="color: #ccc; margin: 5px 0;">${post.text.substring(0, 150)}${post.text.length > 150 ? '...' : ''}</div>
+                    <div style="color: #888; font-size: 0.8em;">by ${post.user}</div>
+                    <div style="color: #666; font-size: 0.8em;">AI Classification: ${post.threat_classification?.primary_threat || 'unknown'}</div>
+                </div>
+            `).join('');
+            
+            // Display German posts
+            const germanContainer = document.getElementById('debug-german-posts');
+            germanContainer.innerHTML = germanPosts.map(post => `
+                <div class="threat-item low" style="margin: 10px 0; padding: 10px; font-size: 0.9em;">
+                    <div><strong>r/${post.subreddit}</strong> - ${new Date(post.timestamp * 1000).toLocaleTimeString()}</div>
+                    <div style="color: #ccc; margin: 5px 0;">${post.text.substring(0, 150)}${post.text.length > 150 ? '...' : ''}</div>
+                    <div style="color: #888; font-size: 0.8em;">by ${post.user}</div>
+                    <div style="color: #666; font-size: 0.8em;">AI Classification: ${post.threat_classification?.primary_threat || 'unknown'}</div>
+                </div>
+            `).join('');
+        }
+
+        // Modify the existing updateDashboard function to include debug data
+        async function updateDashboard() {
+            // Fetch current threats
+            const threatsResponse = await fetch('/api/threats');
+            const threatsData = await threatsResponse.json();
+            
+            // Fetch statistics
+            const statsResponse = await fetch('/api/stats');
+            const statsData = await statsResponse.json();
+            
+            updateStats(statsData);
+            updateThreatsList(threatsData.threats);
+            updateChart(statsData);
+            updateDebugData(threatsData.threats);  // Add this line
+        }
+    </script>
+
+
 </body>
 </html>

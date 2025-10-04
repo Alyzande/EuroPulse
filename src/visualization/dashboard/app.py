@@ -26,6 +26,20 @@ class Dashboard:
         
         print(f"🌐 Using {collector_type} collectors for French and German")
     
+    def _calculate_urgency(self, threat_level, text):
+        """Calculate urgency based on threat level and content"""
+        urgent_words = ['maintenant', 'urgence', 'immédiat', 'panique', 'aktuell', 'sofort', 'Notfall']
+        text_lower = text.lower()
+        
+        if threat_level == 'critical':
+            return 'critical'
+        elif threat_level == 'high' and any(word in text_lower for word in urgent_words):
+            return 'high'
+        elif threat_level == 'high':
+            return 'medium'
+        else:
+            return 'low'
+    
     def get_current_threats(self):
         """Get current threats with prioritization"""
         try:
@@ -33,7 +47,52 @@ class Dashboard:
             de_posts = self.de_collector.collect_recent_posts(limit=8)
             
             all_posts = fr_posts + de_posts
-            threat_posts = [p for p in all_posts if p['threat_level'] != 'normal']
+            
+            # Process posts through classification pipeline
+            processed_posts = []
+            for post in all_posts:
+                # If it's a Reddit post, it needs classification
+                if post.get('platform') == 'reddit' and 'threat_classification' not in post:
+                    try:
+                        # Import processors
+                        from src.processing.text_cleaner import TextCleaner
+                        from src.processing.threat_classifier import ThreatClassifier
+                        from src.processing.location_extractor import LocationExtractor
+                        
+                        cleaner = TextCleaner(post['language'])
+                        classifier = ThreatClassifier(post['language'])
+                        location_extractor = LocationExtractor(post['language'])
+                        
+                        # Clean the text
+                        post['clean_text'] = cleaner.clean_text(post['text'])
+                        
+                        # Classify the threat
+                        post['threat_classification'] = classifier.classify_threat(post['text'])
+                        
+                        # Extract locations
+                        post['locations'] = location_extractor.extract_locations(post['text'])
+                        
+                        # Set threat_level based on classification
+                        classification = post['threat_classification']
+                        post['threat_level'] = classification.get('risk_level', 'normal')
+                        post['threat_type'] = classification.get('primary_threat', 'unknown')
+                        
+                        # Calculate urgency
+                        post['urgency'] = self._calculate_urgency(post['threat_level'], post['text'])
+                        
+                    except Exception as e:
+                        print(f"❌ Error processing Reddit post: {e}")
+                        # Set defaults if processing fails
+                        post['threat_level'] = 'normal'
+                        post['threat_type'] = 'unknown'
+                        post['urgency'] = 'low'
+                        post['threat_classification'] = {}
+                        post['locations'] = []
+                        post['clean_text'] = post['text']
+                
+                processed_posts.append(post)
+            
+            threat_posts = [p for p in processed_posts if p['threat_level'] != 'normal']
             
             # Prioritize threats: critical > high > medium > low
             def threat_priority(post):
