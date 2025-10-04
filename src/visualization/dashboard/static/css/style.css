@@ -1,0 +1,100 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: #0f0f23;
+    color: #00ff00;
+}
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+.dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+.card {
+    background: #1a1a2e;
+    border: 1px solid #00ff00;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 255, 0, 0.1);
+}
+.threat-list {
+    grid-column: 1 / -1;
+}
+.threat-item {
+    background: #16213e;
+    border-left: 4px solid #ff0000;
+    margin: 10px 0;
+    padding: 15px;
+    border-radius: 4px;
+}
+.critical { border-left-color: #ff0000; }
+.high { border-left-color: #ff6b00; }
+.medium { border-left-color: #ffd000; }
+.low { border-left-color: #00ff00; }
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 20px;
+}
+.stat-card {
+    background: #16213e;
+    padding: 15px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.critical-alert {
+    border-left: 6px solid #ff0000 !important;
+    background: #330000 !important;
+    animation: pulse 2s infinite;
+}
+
+.urgent {
+    border: 2px solid #ff6b00 !important;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { opacity: 1; }
+}
+
+.threat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.risk-badge, .urgent-badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+
+.risk-badge { background: #444; }
+.urgent-badge { background: #ff6b00; color: white; }
+
+.threat-text {
+    margin: 8px 0;
+    color: #cccccc;
+}
+
+.threat-locations, .threat-response {
+    font-size: 0.9em;
+    color: #888888;
+    margin: 4px 0;
+}
+
+.card canvas {
+    max-height: 200px;
+    width: 100% !important;
+    height: auto !important;
+}
