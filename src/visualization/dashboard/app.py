@@ -11,15 +11,20 @@ from flask import Flask, render_template, jsonify
 # Add the root project directory to Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
-from src.data.collectors.threat_collector import ThreatCollector
+from src.data.collectors.collector_factory import get_collector
 
 app = Flask(__name__)
 
 class Dashboard:
     def __init__(self):
-        self.fr_collector = ThreatCollector('fr')
-        self.de_collector = ThreatCollector('de')
+        # Use environment variable to choose collector type, default to 'mock'
+        collector_type = os.getenv('COLLECTOR_TYPE', 'mock')
+        
+        self.fr_collector = get_collector(collector_type, 'fr')
+        self.de_collector = get_collector(collector_type, 'de')
         self.threat_history = []
+        
+        print(f"🌐 Using {collector_type} collectors for French and German")
     
     def get_current_threats(self):
         """Get current threats with prioritization"""
