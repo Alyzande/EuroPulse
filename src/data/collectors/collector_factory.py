@@ -2,15 +2,12 @@
 Factory to switch between data collectors
 """
 
-def get_collector(collector_type='simulation', language='fr'):
+def get_collector(collector_type='mock', language='fr'):
     """
     Get a data collector based on type
-    Options: 'mock', 'twitter', 'reddit', 'aggregated', 'simulation'
+    Options: 'mock', 'reddit', 'aggregated', 'simulation'
     """
-    if collector_type == 'twitter':
-        from .twitter_collector import TwitterCollector
-        return TwitterCollector(language)
-    elif collector_type == 'reddit':
+    if collector_type == 'reddit':
         from .reddit_collector import RedditCollector
         return RedditCollector(language)
     elif collector_type == 'aggregated':
