@@ -208,3 +208,22 @@ body {
     color: #666;
     font-size: 0.8em;
 }
+
+.simulation-toggle {
+    margin: 10px 0 20px 0;
+    text-align: center;
+}
+.simulation-toggle button {
+    background-color: #222;
+    border: 1px solid #0f0;
+    color: #0f0;
+    padding: 8px 14px;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.simulation-toggle button:hover {
+    background-color: #0f0;
+    color: #000;
+}
+

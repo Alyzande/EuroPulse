@@ -1,270 +1,260 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EuroPulse - Real-Time Threat Detection</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EuroPulse - Real-Time Threat Detection</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #000;
+      color: #0f0;
+    }
+
+    .mode-selector {
+      margin: 15px 0 25px 0;
+      text-align: center;
+    }
+
+    .mode-selector label {
+      font-weight: bold;
+      margin-right: 8px;
+    }
+
+    .mode-selector select {
+      background-color: #111;
+      border: 1px solid #0f0;
+      color: #0f0;
+      padding: 6px 12px;
+      font-size: 1em;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .mode-selector select:hover {
+      background-color: #0f0;
+      color: #000;
+    }
+
+    .mode-status {
+      margin-left: 12px;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🚨 EuroPulse - Real-Time Threat Detection</h1>
-        <p>Monitoring French & German social media for physical threats</p>
+  <div class="header">
+    <h1>🚨 EuroPulse - Real-Time Threat Detection</h1>
+    <p>Monitoring French & German social media for physical threats</p>
+  </div>
+
+  <!-- Data Mode Selector -->
+  <div class="mode-selector">
+    <label for="modeSelect">🌐 Data Source:</label>
+    <select id="modeSelect" onchange="changeMode()">
+      <option value="simulation">🧠 Simulation</option>
+      <option value="reddit">🧵 Reddit</option>
+      <option value="mastodon">🐘 Mastodon</option>
+      <option value="bluesky">💬 Bluesky</option>
+      <option value="aggregate">🌍 Aggregate</option>
+    </select>
+    <span id="modeStatus" class="mode-status">(Active: Simulation)</span>
+  </div>
+
+  <div class="dashboard">
+    <div class="card">
+      <h2>📊 Threat Statistics</h2>
+      <div class="stats-grid" id="stats-grid"></div>
     </div>
 
-    <div class="dashboard">
-        <div class="card">
-            <h2>📊 Threat Statistics</h2>
-            <div class="stats-grid" id="stats-grid">
-                <!-- Stats will be populated by JavaScript -->
-            </div>
-        </div>
-
-        <div class="card">
-            <h2>🌍 Threat Map</h2>
-            <canvas id="threatChart"></canvas>
-        </div>
-
-        <div class="card threat-list">
-            <h2>🚨 CRITICAL ALERTS</h2>
-            <div id="critical-alerts">
-                <!-- Critical threats will go here -->
-            </div>
-            
-            <h2>⚠️ ACTIVE THREATS</h2>
-            <div id="active-threats">
-                <!-- Other threats will go here -->
-            </div>
-            
-            <h2>📋 ONGOING MONITORING</h2>
-            <div id="ongoing-threats">
-                <!-- Low-priority threats will go here -->
-            </div>
-        </div>
+    <div class="card">
+      <h2>🌍 Threat Map</h2>
+      <canvas id="threatChart"></canvas>
     </div>
 
-    <script>
-        let threatChart;
+    <div class="card threat-list">
+      <h2>🚨 CRITICAL ALERTS</h2>
+      <div id="critical-alerts"></div>
 
-        async function updateDashboard() {
-            // Fetch current threats
-            const threatsResponse = await fetch('/api/threats');
-            const threatsData = await threatsResponse.json();
-            
-            // Fetch statistics
-            const statsResponse = await fetch('/api/stats');
-            const statsData = await statsResponse.json();
-            
-            updateStats(statsData);
-            updateThreatsList(threatsData.threats);
-            updateChart(statsData);
-        }
+      <h2>⚠️ ACTIVE THREATS</h2>
+      <div id="active-threats"></div>
 
-        function updateStats(stats) {
-            const statsGrid = document.getElementById('stats-grid');
-            statsGrid.innerHTML = `
-                <div class="stat-card">
-                    <h3>Active Threats</h3>
-                    <div style="font-size: 2em; color: #ff0000;">${stats.total_threats}</div>
-                </div>
-                <div class="stat-card">
-                    <h3>High/Critical</h3>
-                    <div style="font-size: 2em; color: #ff6b00;">${stats.risk_levels.high + stats.risk_levels.critical}</div>
-                </div>
-                <div class="stat-card">
-                    <h3>Countries</h3>
-                    <div style="font-size: 2em; color: #00ff00;">${Object.keys(stats.countries).length}</div>
-                </div>
-            `;
-        }
-
-        function updateThreatsList(threats) {
-            // Separate threats by priority
-            const criticalAlerts = threats.filter(t => 
-                t.threat_classification?.risk_level === 'critical' || 
-                (t.threat_classification?.risk_level === 'high' && t.threat_classification?.urgency_detected)
-            );
-            
-            const activeThreats = threats.filter(t => 
-                t.threat_classification?.risk_level === 'high' && 
-                !criticalAlerts.includes(t)
-            );
-            
-            const ongoingThreats = threats.filter(t => 
-                t.threat_classification?.risk_level === 'medium' || 
-                t.threat_classification?.risk_level === 'low'
-            );
-
-            updateThreatSection('critical-alerts', criticalAlerts, '🚨 CRITICAL ALERT - IMMEDIATE RESPONSE NEEDED');
-            updateThreatSection('active-threats', activeThreats, 'No high-priority threats');
-            updateThreatSection('ongoing-threats', ongoingThreats, 'No ongoing threats');
-        }
-
-        function updateThreatSection(sectionId, threats, emptyMessage) {
-            const section = document.getElementById(sectionId);
-            
-            if (threats.length === 0) {
-                section.innerHTML = `<div class="threat-item low">${emptyMessage}</div>`;
-                return;
-            }
-            
-            section.innerHTML = threats.map(threat => {
-                const classification = threat.threat_classification || {};
-                const riskLevel = classification.risk_level || 'low';
-                const locations = threat.locations || [];
-                const isUrgent = classification.urgency_detected;
-                const isCritical = riskLevel === 'critical' || (riskLevel === 'high' && isUrgent);
-                
-                return `
-                    <div class="threat-item ${riskLevel} ${isUrgent ? 'urgent' : ''} ${isCritical ? 'critical-alert' : ''}">
-                        <div class="threat-header">
-                            <strong>${classification.primary_threat || 'Unknown Threat'}</strong> 
-                            <span class="risk-badge">${riskLevel.toUpperCase()}</span>
-                            ${isUrgent ? '<span class="urgent-badge">⚡ URGENT</span>' : ''}
-                        </div>
-                        <div class="threat-text">${threat.text}</div>
-                        ${locations.length > 0 ? `
-                        <div class="threat-locations">
-                            📍 ${locations.map(l => `${l.name} (${l.city}, ${l.country})`).join(', ')}
-                        </div>
-                        ` : ''}
-                        <div class="threat-response">
-                            🚑 ${classification.response_needed || 'Monitoring'}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function updateChart(stats) {
-            const ctx = document.getElementById('threatChart').getContext('2d');
-            
-            if (threatChart) {
-                threatChart.destroy();
-            }
-            
-            threatChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(stats.threat_types),
-                    datasets: [{
-                        data: Object.values(stats.threat_types),
-                        backgroundColor: ['#ff0000', '#ff6b00', '#ffd000', '#00ff00', '#007bff']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                color: '#00ff00',
-                                boxWidth: 12,
-                                font: {
-                                    size: 10
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        // Update every 10 seconds
-        setInterval(updateDashboard, 10000);
-        updateDashboard(); // Initial load
-    </script>
-
-
-    <!-- Debug Section - Raw Reddit Data -->
-    <div class="card" style="margin-top: 20px;">
-        <h2 onclick="toggleDebug()" style="cursor: pointer; color: #888;">🔍 Debug: Raw Reddit Posts (Click to Show)</h2>
-        <div id="debug-section" style="display: none;">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>French Posts</h3>
-                    <div id="debug-fr-count">0</div>
-                </div>
-                <div class="stat-card">
-                    <h3>German Posts</h3>
-                    <div id="debug-de-count">0</div>
-                </div>
-                <div class="stat-card">
-                    <h3>Total Raw</h3>
-                    <div id="debug-total-count">0</div>
-                </div>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
-                <div>
-                    <h4>🇫🇷 French Posts</h4>
-                    <div id="debug-french-posts" style="max-height: 400px; overflow-y: auto;"></div>
-                </div>
-                <div>
-                    <h4>🇩🇪 German Posts</h4>
-                    <div id="debug-german-posts" style="max-height: 400px; overflow-y: auto;"></div>
-                </div>
-            </div>
-        </div>
+      <h2>📋 ONGOING MONITORING</h2>
+      <div id="ongoing-threats"></div>
     </div>
+  </div>
 
-    <script>
-        function toggleDebug() {
-            const debugSection = document.getElementById('debug-section');
-            debugSection.style.display = debugSection.style.display === 'none' ? 'block' : 'none';
+  <!-- Debug Section -->
+  <div class="card debug-section">
+    <h2 onclick="toggleDebug()" class="debug-toggle">🔍 Debug: Raw Data Sources (Click to Show)</h2>
+    <div id="debug-section" class="debug-content">
+      <div class="stats-grid">
+        <div class="stat-card"><h3>French Posts</h3><div id="debug-fr-count">0</div></div>
+        <div class="stat-card"><h3>German Posts</h3><div id="debug-de-count">0</div></div>
+        <div class="stat-card"><h3>Total Raw</h3><div id="debug-total-count">0</div></div>
+      </div>
+      <div class="debug-grid">
+        <div><h4>🇫🇷 French Sources</h4><div id="debug-french-posts" class="debug-posts"></div></div>
+        <div><h4>🇩🇪 German Sources</h4><div id="debug-german-posts" class="debug-posts"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let threatChart;
+
+    // ------------------------------
+    // Dashboard update functions
+    // ------------------------------
+    async function updateDashboard() {
+      const threatsResponse = await fetch('/api/threats');
+      const threatsData = await threatsResponse.json();
+      const statsResponse = await fetch('/api/stats');
+      const statsData = await statsResponse.json();
+
+      updateStats(statsData);
+      updateThreatsList(threatsData.threats);
+      updateChart(statsData);
+      updateDebugData(threatsData.threats);
+    }
+
+    function updateStats(stats) {
+      const statsGrid = document.getElementById('stats-grid');
+      statsGrid.innerHTML = `
+        <div class="stat-card"><h3>Active Threats</h3><div class="stat-number">${stats.total_threats}</div></div>
+        <div class="stat-card"><h3>High/Critical</h3><div class="stat-number">${stats.risk_levels.high + stats.risk_levels.critical}</div></div>
+        <div class="stat-card"><h3>Countries</h3><div class="stat-number">${Object.keys(stats.countries).length}</div></div>
+      `;
+    }
+
+    function updateThreatsList(threats) {
+      const criticalAlerts = threats.filter(t =>
+        t.threat_classification?.risk_level === 'critical' ||
+        (t.threat_classification?.risk_level === 'high' && t.threat_classification?.urgency_detected)
+      );
+      const activeThreats = threats.filter(t =>
+        t.threat_classification?.risk_level === 'high' && !criticalAlerts.includes(t)
+      );
+      const ongoingThreats = threats.filter(t =>
+        ['medium', 'low'].includes(t.threat_classification?.risk_level)
+      );
+      updateThreatSection('critical-alerts', criticalAlerts, '🚨 CRITICAL ALERT - IMMEDIATE RESPONSE NEEDED');
+      updateThreatSection('active-threats', activeThreats, 'No high-priority threats');
+      updateThreatSection('ongoing-threats', ongoingThreats, 'No ongoing threats');
+    }
+
+    function updateThreatSection(sectionId, threats, emptyMessage) {
+      const section = document.getElementById(sectionId);
+      if (threats.length === 0) {
+        section.innerHTML = `<div class="threat-item low">${emptyMessage}</div>`;
+        return;
+      }
+      section.innerHTML = threats.map(threat => {
+        const c = threat.threat_classification || {};
+        const r = c.risk_level || 'low';
+        const locations = threat.locations || [];
+        const urgent = c.urgency_detected;
+        const critical = r === 'critical' || (r === 'high' && urgent);
+        return `
+          <div class="threat-item ${r} ${urgent ? 'urgent' : ''} ${critical ? 'critical-alert' : ''}">
+            <div class="threat-header">
+              <strong>${c.primary_threat || 'Unknown Threat'}</strong>
+              <span class="risk-badge">${r.toUpperCase()}</span>
+              ${urgent ? '<span class="urgent-badge">⚡ URGENT</span>' : ''}
+            </div>
+            <div class="threat-text">${threat.text}</div>
+            ${locations.length ? `<div class="threat-locations">📍 ${locations.map(l => `${l.name} (${l.city}, ${l.country})`).join(', ')}</div>` : ''}
+            <div class="threat-response">🚑 ${c.response_needed || 'Monitoring'}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateChart(stats) {
+      const ctx = document.getElementById('threatChart').getContext('2d');
+      if (threatChart) threatChart.destroy();
+      threatChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(stats.threat_types),
+          datasets: [{ data: Object.values(stats.threat_types), backgroundColor: ['#ff0000','#ff6b00','#ffd000','#00ff00','#007bff'] }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { color: '#00ff00', boxWidth: 12, font: { size: 10 } } } }
         }
+      });
+    }
 
-        function updateDebugData(threats) {
-            // Separate posts by language and platform
-            const frenchPosts = threats.filter(t => t.language === 'fr' && t.platform === 'reddit');
-            const germanPosts = threats.filter(t => t.language === 'de' && t.platform === 'reddit');
-            
-            // Update counts
-            document.getElementById('debug-fr-count').textContent = frenchPosts.length;
-            document.getElementById('debug-de-count').textContent = germanPosts.length;
-            document.getElementById('debug-total-count').textContent = frenchPosts.length + germanPosts.length;
-            
-            // Display French posts
-            const frenchContainer = document.getElementById('debug-french-posts');
-            frenchContainer.innerHTML = frenchPosts.map(post => `
-                <div class="threat-item low" style="margin: 10px 0; padding: 10px; font-size: 0.9em;">
-                    <div><strong>r/${post.subreddit}</strong> - ${new Date(post.timestamp * 1000).toLocaleTimeString()}</div>
-                    <div style="color: #ccc; margin: 5px 0;">${post.text.substring(0, 150)}${post.text.length > 150 ? '...' : ''}</div>
-                    <div style="color: #888; font-size: 0.8em;">by ${post.user}</div>
-                    <div style="color: #666; font-size: 0.8em;">AI Classification: ${post.threat_classification?.primary_threat || 'unknown'}</div>
-                </div>
-            `).join('');
-            
-            // Display German posts
-            const germanContainer = document.getElementById('debug-german-posts');
-            germanContainer.innerHTML = germanPosts.map(post => `
-                <div class="threat-item low" style="margin: 10px 0; padding: 10px; font-size: 0.9em;">
-                    <div><strong>r/${post.subreddit}</strong> - ${new Date(post.timestamp * 1000).toLocaleTimeString()}</div>
-                    <div style="color: #ccc; margin: 5px 0;">${post.text.substring(0, 150)}${post.text.length > 150 ? '...' : ''}</div>
-                    <div style="color: #888; font-size: 0.8em;">by ${post.user}</div>
-                    <div style="color: #666; font-size: 0.8em;">AI Classification: ${post.threat_classification?.primary_threat || 'unknown'}</div>
-                </div>
-            `).join('');
-        }
+    // ------------------------------
+    // Mode selector logic
+    // ------------------------------
+    async function refreshModeStatus() {
+      const res = await fetch('/api/mode/status');
+      const data = await res.json();
+      const select = document.getElementById('modeSelect');
+      const status = document.getElementById('modeStatus');
 
-        // Modify the existing updateDashboard function to include debug data
-        async function updateDashboard() {
-            // Fetch current threats
-            const threatsResponse = await fetch('/api/threats');
-            const threatsData = await threatsResponse.json();
-            
-            // Fetch statistics
-            const statsResponse = await fetch('/api/stats');
-            const statsData = await statsResponse.json();
-            
-            updateStats(statsData);
-            updateThreatsList(threatsData.threats);
-            updateChart(statsData);
-            updateDebugData(threatsData.threats);  // Add this line
-        }
-    </script>
+      select.value = data.mode;
 
+      const colorMap = {
+        simulation: '#ff6600',
+        reddit: '#ff0000',
+        mastodon: '#00acee',
+        bluesky: '#00bfff',
+        aggregate: '#00ff00'
+      };
 
+      status.textContent = `(Active: ${data.mode.charAt(0).toUpperCase() + data.mode.slice(1)})`;
+      status.style.color = colorMap[data.mode] || '#0f0';
+    }
+
+    async function changeMode() {
+      const mode = document.getElementById('modeSelect').value;
+      await fetch('/api/mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+      });
+      await refreshModeStatus();
+      await updateDashboard();
+    }
+
+    // ------------------------------
+    // Debug utilities
+    // ------------------------------
+    function toggleDebug() {
+      const debugSection = document.getElementById('debug-section');
+      debugSection.style.display = debugSection.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function updateDebugData(threats) {
+      const fr = threats.filter(t => t.language === 'fr');
+      const de = threats.filter(t => t.language === 'de');
+      document.getElementById('debug-fr-count').textContent = fr.length;
+      document.getElementById('debug-de-count').textContent = de.length;
+      document.getElementById('debug-total-count').textContent = fr.length + de.length;
+      document.getElementById('debug-french-posts').innerHTML = fr.map(post =>
+        `<div class="debug-post"><div><strong>${post.platform || 'unknown'}</strong> - ${new Date(post.timestamp*1000).toLocaleTimeString()}</div>
+        <div class="debug-text">${post.text.substring(0,150)}${post.text.length>150?'...':''}</div>
+        <div class="debug-meta">by ${post.user}</div><div class="debug-classification">AI: ${post.threat_classification?.primary_threat || 'unknown'}</div></div>`
+      ).join('');
+      document.getElementById('debug-german-posts').innerHTML = de.map(post =>
+        `<div class="debug-post"><div><strong>${post.platform || 'unknown'}</strong> - ${new Date(post.timestamp*1000).toLocaleTimeString()}</div>
+        <div class="debug-text">${post.text.substring(0,150)}${post.text.length>150?'...':''}</div>
+        <div class="debug-meta">by ${post.user}</div><div class="debug-classification">AI: ${post.threat_classification?.primary_threat || 'unknown'}</div></div>`
+      ).join('');
+    }
+
+    // ------------------------------
+    // Initialization
+    // ------------------------------
+    setInterval(updateDashboard, 10000);
+    refreshModeStatus();
+    updateDashboard();
+  </script>
 </body>
 </html>

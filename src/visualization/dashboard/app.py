@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
 EuroPulse Real-Time Threat Dashboard
+Supports multiple collector modes:
+simulation | reddit | mastodon | bluesky | aggregate
 """
 
 import sys
@@ -12,17 +14,17 @@ from flask import Flask, render_template, jsonify, request
 # ---------------------------------------------------------
 # Path Setup
 # ---------------------------------------------------------
-# Add the root project directory to Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
 from src.data.collectors.collector_factory import get_collector
 
 
 # ---------------------------------------------------------
-# Flask Setup - explicitly set template/static folders
+# Flask Setup
 # ---------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent
 print("🧭 TEMPLATE PATH:", BASE_DIR / "templates")
+
 app = Flask(
     __name__,
     template_folder=str(BASE_DIR / "templates"),
@@ -34,12 +36,22 @@ app = Flask(
 # Dashboard Logic
 # ---------------------------------------------------------
 class Dashboard:
-    def __init__(self):
-        collector_type = os.getenv('COLLECTOR_TYPE', 'mock')
-        self.fr_collector = get_collector(collector_type, 'fr')
-        self.de_collector = get_collector(collector_type, 'de')
+    def __init__(self, collector_type='mock'):
+        self.collector_type = collector_type
+        self._init_collectors()
         self.threat_history = []
         print(f"🌐 Using {collector_type} collectors for French and German")
+
+    def _init_collectors(self):
+        """Initialize collectors for both languages based on mode"""
+        self.fr_collector = get_collector(self.collector_type, 'fr')
+        self.de_collector = get_collector(self.collector_type, 'de')
+
+    def switch_mode(self, mode):
+        """Reinitialize collectors for new mode"""
+        self.collector_type = mode
+        self._init_collectors()
+        print(f"🔁 Collectors switched to: {mode}")
 
     def _calculate_urgency(self, threat_level, text):
         urgent_words = [
@@ -165,54 +177,50 @@ class Dashboard:
 
 
 # ---------------------------------------------------------
-# Flask Routes and Simulation Mode
+# Flask Routes
 # ---------------------------------------------------------
-dashboard = Dashboard()
-simulation_mode = False  # global toggle
+dashboard = Dashboard(os.getenv('COLLECTOR_TYPE', 'mock'))
+current_mode = os.getenv('COLLECTOR_TYPE', 'mock')
+simulation_mode = (current_mode == 'simulation')
 
 
 @app.route('/')
 def index():
     """Main dashboard page"""
-    import time
     path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'templates', 'index.html'))
     print("🧩 Rendering index.html from:", path)
     return render_template('index.html', time=time)
 
 
-
-
-@app.route('/api/simulation/status', methods=['GET'])
-def get_simulation_status():
-    """Return current simulation mode status"""
-    return jsonify({
-        'simulation_mode': simulation_mode,
-        'status': 'simulation' if simulation_mode else 'active',
-        'message': (
-            'Simulation mode active - showing demo threat scenarios'
-            if simulation_mode
-            else 'System is collecting real data with fallbacks'
-        )
-    })
-
-
-@app.route('/api/simulation/toggle', methods=['POST'])
-def toggle_simulation():
-    """Toggle between simulation and normal mode"""
-    global simulation_mode
+# --- Mode Management Endpoints ----------------------------------------------
+@app.route('/api/mode', methods=['POST'])
+def set_mode():
+    """Switch between data modes: simulation, reddit, mastodon, bluesky, aggregate"""
+    global current_mode, simulation_mode, dashboard
     data = request.json or {}
-    new_mode = data.get('enabled', False)
-    simulation_mode = bool(new_mode)
-    mode_text = "SIMULATION" if simulation_mode else "NORMAL"
-    print(f"🔄 Switching to {mode_text} MODE")
+    new_mode = data.get('mode', 'simulation').lower()
 
-    return jsonify({
-        'simulation_mode': simulation_mode,
-        'message': f'Switched to {mode_text.lower()} mode',
-        'success': True
-    })
+    valid_modes = ['simulation', 'reddit', 'mastodon', 'bluesky', 'aggregate']
+    if new_mode not in valid_modes:
+        return jsonify({'error': f'Invalid mode: {new_mode}', 'success': False}), 400
+
+    os.environ['COLLECTOR_TYPE'] = new_mode
+    current_mode = new_mode
+    simulation_mode = (new_mode == 'simulation')
+
+    dashboard.switch_mode(new_mode)
+    print(f"🔄 Switched data mode → {new_mode.upper()}")
+
+    return jsonify({'success': True, 'mode': new_mode, 'message': f'Switched to {new_mode} mode'})
 
 
+@app.route('/api/mode/status', methods=['GET'])
+def get_mode_status():
+    """Return current collector/mode type"""
+    return jsonify({'mode': current_mode, 'simulation_mode': simulation_mode})
+
+
+# --- Threat Data -------------------------------------------------------------
 @app.route('/api/threats')
 def get_threats():
     """API endpoint for current threats"""
@@ -225,11 +233,7 @@ def get_threats():
     else:
         threats = dashboard.get_current_threats()
 
-    return jsonify({
-        'threats': threats,
-        'total_threats': len(threats),
-        'timestamp': time.time()
-    })
+    return jsonify({'threats': threats, 'total_threats': len(threats), 'timestamp': time.time()})
 
 
 @app.route('/api/stats')
