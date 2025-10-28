@@ -44,14 +44,20 @@ class Dashboard:
 
     def _init_collectors(self):
         """Initialize collectors for both languages based on mode"""
-        self.fr_collector = get_collector(self.collector_type, 'fr')
-        self.de_collector = get_collector(self.collector_type, 'de')
+        try:
+            self.fr_collector = get_collector(self.collector_type, 'fr')
+            self.de_collector = get_collector(self.collector_type, 'de')
+        except Exception as e:
+            print(f"❌ Error initializing collectors ({self.collector_type}): {e}")
+            print("⚠️ Falling back to mock collectors.")
+            self.fr_collector = get_collector('mock', 'fr')
+            self.de_collector = get_collector('mock', 'de')
 
     def switch_mode(self, mode):
-        """Reinitialize collectors for new mode"""
+        """Reinitialize collectors for a new mode"""
+        print(f"🔁 Switching collectors to mode: {mode}")
         self.collector_type = mode
         self._init_collectors()
-        print(f"🔁 Collectors switched to: {mode}")
 
     def _calculate_urgency(self, threat_level, text):
         urgent_words = [
@@ -59,7 +65,6 @@ class Dashboard:
             'aktuell', 'sofort', 'Notfall'
         ]
         text_lower = text.lower()
-
         if threat_level == 'critical':
             return 'critical'
         elif threat_level == 'high' and any(word in text_lower for word in urgent_words):
@@ -70,6 +75,7 @@ class Dashboard:
             return 'low'
 
     def get_current_threats(self):
+        """Retrieve and process threats from current collectors"""
         try:
             fr_posts = self.fr_collector.collect_recent_posts(limit=8)
             de_posts = self.de_collector.collect_recent_posts(limit=8)
@@ -137,8 +143,8 @@ class Dashboard:
             return []
 
     def get_threat_summary(self):
+        """Aggregate summary stats for dashboard"""
         threats = self.get_current_threats()
-
         if not threats:
             return {
                 'total_threats': 0,
@@ -195,7 +201,7 @@ def index():
 # --- Mode Management Endpoints ----------------------------------------------
 @app.route('/api/mode', methods=['POST'])
 def set_mode():
-    """Switch between data modes: simulation, reddit, mastodon, bluesky, aggregate"""
+    """Switch between data modes"""
     global current_mode, simulation_mode, dashboard
     data = request.json or {}
     new_mode = data.get('mode', 'simulation').lower()
@@ -211,12 +217,12 @@ def set_mode():
     dashboard.switch_mode(new_mode)
     print(f"🔄 Switched data mode → {new_mode.upper()}")
 
-    return jsonify({'success': True, 'mode': new_mode, 'message': f'Switched to {new_mode} mode'})
+    return jsonify({'success': True, 'mode': new_mode})
 
 
 @app.route('/api/mode/status', methods=['GET'])
 def get_mode_status():
-    """Return current collector/mode type"""
+    """Return current mode"""
     return jsonify({'mode': current_mode, 'simulation_mode': simulation_mode})
 
 
@@ -224,7 +230,8 @@ def get_mode_status():
 @app.route('/api/threats')
 def get_threats():
     """API endpoint for current threats"""
-    if simulation_mode:
+    print(f"📡 Fetching threats for mode: {current_mode}")
+    if current_mode == 'simulation':
         print("🎭 Serving simulated threat data...")
         from src.data.collectors.threat_collector import ThreatCollector
         fr_collector = ThreatCollector('fr')

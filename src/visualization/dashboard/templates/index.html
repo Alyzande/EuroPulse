@@ -7,40 +7,43 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #000;
-      color: #0f0;
-    }
-
-    .mode-selector {
+    /* Inline CSS for mode bar (also repeated in style.css later) */
+    .mode-bar {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
       margin: 15px 0 25px 0;
-      text-align: center;
     }
 
-    .mode-selector label {
-      font-weight: bold;
-      margin-right: 8px;
-    }
-
-    .mode-selector select {
+    .mode-btn {
       background-color: #111;
       border: 1px solid #0f0;
       color: #0f0;
-      padding: 6px 12px;
-      font-size: 1em;
+      padding: 8px 14px;
       border-radius: 6px;
       cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s ease-in-out;
     }
 
-    .mode-selector select:hover {
+    .mode-btn:hover {
       background-color: #0f0;
       color: #000;
     }
 
+    .mode-btn.active {
+      background-color: #0f0;
+      color: #000;
+      box-shadow: 0 0 10px #0f0;
+      transform: scale(1.05);
+    }
+
     .mode-status {
-      margin-left: 12px;
+      text-align: center;
+      margin-top: 8px;
       font-weight: bold;
+      color: #0f0;
     }
   </style>
 </head>
@@ -50,18 +53,15 @@
     <p>Monitoring French & German social media for physical threats</p>
   </div>
 
-  <!-- Data Mode Selector -->
-  <div class="mode-selector">
-    <label for="modeSelect">🌐 Data Source:</label>
-    <select id="modeSelect" onchange="changeMode()">
-      <option value="simulation">🧠 Simulation</option>
-      <option value="reddit">🧵 Reddit</option>
-      <option value="mastodon">🐘 Mastodon</option>
-      <option value="bluesky">💬 Bluesky</option>
-      <option value="aggregate">🌍 Aggregate</option>
-    </select>
-    <span id="modeStatus" class="mode-status">(Active: Simulation)</span>
+  <!-- Mode Selector Buttons -->
+  <div class="mode-bar">
+    <button class="mode-btn" data-mode="simulation">🧠 Simulation</button>
+    <button class="mode-btn" data-mode="reddit">🧵 Reddit</button>
+    <button class="mode-btn" data-mode="mastodon">🐘 Mastodon</button>
+    <button class="mode-btn" data-mode="bluesky">💬 Bluesky</button>
+    <button class="mode-btn" data-mode="aggregate">🌍 Aggregate</button>
   </div>
+  <div id="modeStatus" class="mode-status">(Active: Simulation)</div>
 
   <div class="dashboard">
     <div class="card">
@@ -106,7 +106,7 @@
     let threatChart;
 
     // ------------------------------
-    // Dashboard update functions
+    // Dashboard updates
     // ------------------------------
     async function updateDashboard() {
       const threatsResponse = await fetch('/api/threats');
@@ -195,25 +195,17 @@
     async function refreshModeStatus() {
       const res = await fetch('/api/mode/status');
       const data = await res.json();
-      const select = document.getElementById('modeSelect');
       const status = document.getElementById('modeStatus');
+      const buttons = document.querySelectorAll('.mode-btn');
 
-      select.value = data.mode;
-
-      const colorMap = {
-        simulation: '#ff6600',
-        reddit: '#ff0000',
-        mastodon: '#00acee',
-        bluesky: '#00bfff',
-        aggregate: '#00ff00'
-      };
+      buttons.forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.querySelector(`.mode-btn[data-mode="${data.mode}"]`);
+      if (activeBtn) activeBtn.classList.add('active');
 
       status.textContent = `(Active: ${data.mode.charAt(0).toUpperCase() + data.mode.slice(1)})`;
-      status.style.color = colorMap[data.mode] || '#0f0';
     }
 
-    async function changeMode() {
-      const mode = document.getElementById('modeSelect').value;
+    async function selectMode(mode) {
       await fetch('/api/mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -222,6 +214,15 @@
       await refreshModeStatus();
       await updateDashboard();
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => selectMode(btn.dataset.mode));
+      });
+      refreshModeStatus();
+      updateDashboard();
+      setInterval(updateDashboard, 10000);
+    });
 
     // ------------------------------
     // Debug utilities
@@ -248,13 +249,6 @@
         <div class="debug-meta">by ${post.user}</div><div class="debug-classification">AI: ${post.threat_classification?.primary_threat || 'unknown'}</div></div>`
       ).join('');
     }
-
-    // ------------------------------
-    // Initialization
-    // ------------------------------
-    setInterval(updateDashboard, 10000);
-    refreshModeStatus();
-    updateDashboard();
   </script>
 </body>
 </html>
