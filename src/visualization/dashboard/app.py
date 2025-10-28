@@ -13,14 +13,15 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
 from src.data.collectors.collector_factory import get_collector
 
+
 app = Flask(__name__)
+
 
 class Dashboard:
     def __init__(self):
         # Use environment variable to choose collector type, default to 'mock'
         collector_type = os.getenv('COLLECTOR_TYPE', 'mock')
         
-        self.collector_type = collector_type
         self.fr_collector = get_collector(collector_type, 'fr')
         self.de_collector = get_collector(collector_type, 'de')
         self.threat_history = []
@@ -55,7 +56,6 @@ class Dashboard:
                 # If it's a Reddit post, it needs classification
                 if post.get('platform') == 'reddit' and 'threat_classification' not in post:
                     try:
-                        # Import processors
                         from src.processing.text_cleaner import TextCleaner
                         from src.processing.threat_classifier import ThreatClassifier
                         from src.processing.location_extractor import LocationExtractor
@@ -83,7 +83,6 @@ class Dashboard:
                         
                     except Exception as e:
                         print(f"❌ Error processing Reddit post: {e}")
-                        # Set defaults if processing fails
                         post['threat_level'] = 'normal'
                         post['threat_type'] = 'unknown'
                         post['urgency'] = 'low'
@@ -95,30 +94,23 @@ class Dashboard:
             
             threat_posts = [p for p in processed_posts if p['threat_level'] != 'normal']
             
-            # Prioritize threats: critical > high > medium > low
             def threat_priority(post):
                 classification = post.get('threat_classification', {})
                 risk_level = classification.get('risk_level', 'low')
                 urgency = classification.get('urgency_detected', False)
                 
-                # Priority weights
                 weights = {'critical': 400, 'high': 300, 'medium': 200, 'low': 100}
                 priority = weights.get(risk_level, 0)
                 
-                # Boost priority for urgent threats
                 if urgency:
                     priority += 50
-                    
-                # Boost priority for recent threats (last 5 minutes)
                 if post.get('timestamp', 0) > time.time() - 300:
                     priority += 25
                     
                 return priority
             
-            # Sort by priority (highest first)
             threat_posts.sort(key=threat_priority, reverse=True)
             
-            # Add to history
             for post in threat_posts:
                 self.threat_history.append({
                     'timestamp': time.time(),
@@ -126,7 +118,6 @@ class Dashboard:
                     'priority': threat_priority(post)
                 })
             
-            # Keep only last 50 threats
             self.threat_history = self.threat_history[-50:]
             
             return threat_posts
@@ -147,7 +138,6 @@ class Dashboard:
                 'languages': {'fr': 0, 'de': 0}
             }
         
-        # Count statistics
         threat_types = {}
         risk_levels = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
         countries = {}
@@ -160,13 +150,11 @@ class Dashboard:
             
             threat_types[threat_type] = threat_types.get(threat_type, 0) + 1
             
-            # Combine 'critical' and 'high' for statistics display
             actual_risk = 'high' if risk_level in ['high', 'critical'] else risk_level
             risk_levels[actual_risk] = risk_levels.get(actual_risk, 0) + 1
             
             languages[threat['language']] = languages.get(threat['language'], 0) + 1
             
-            # Count countries from locations
             for location in threat.get('locations', []):
                 country = location.get('country', 'unknown')
                 countries[country] = countries.get(country, 0) + 1
@@ -180,20 +168,62 @@ class Dashboard:
         }
 
 
+# ----------------------------
+# Flask Routes and Simulation Mode
+# ----------------------------
+
 dashboard = Dashboard()
+simulation_mode = False  # global toggle
 
 
 @app.route('/')
 def index():
     """Main dashboard page"""
-    print("✅ Serving latest index.html from visualization/dashboard/templates/")
     return render_template('index.html')
+
+
+@app.route('/api/simulation/status', methods=['GET'])
+def get_simulation_status():
+    """Return current simulation mode status"""
+    return jsonify({
+        'simulation_mode': simulation_mode,
+        'status': 'simulation' if simulation_mode else 'active',
+        'message': 'Simulation mode active - showing demo threat scenarios'
+        if simulation_mode
+        else 'System is collecting real data with fallbacks'
+    })
+
+
+@app.route('/api/simulation/toggle', methods=['POST'])
+def toggle_simulation():
+    """Toggle between simulation and normal mode"""
+    global simulation_mode
+    data = request.json or {}
+    new_mode = data.get('enabled', False)
+    simulation_mode = bool(new_mode)
+
+    mode_text = "SIMULATION" if simulation_mode else "NORMAL"
+    print(f"🔄 Switching to {mode_text} MODE")
+
+    return jsonify({
+        'simulation_mode': simulation_mode,
+        'message': f'Switched to {mode_text.lower()} mode',
+        'success': True
+    })
 
 
 @app.route('/api/threats')
 def get_threats():
     """API endpoint for current threats"""
-    threats = dashboard.get_current_threats()
+    if simulation_mode:
+        print("🎭 Serving simulated threat data...")
+        from src.data.collectors.threat_collector import ThreatCollector
+        fr_collector = ThreatCollector('fr')
+        de_collector = ThreatCollector('de')
+        threats = fr_collector.collect_recent_posts(limit=10) + de_collector.collect_recent_posts(limit=10)
+    else:
+        threats = dashboard.get_current_threats()
+
     return jsonify({
         'threats': threats,
         'total_threats': len(threats),
@@ -212,29 +242,6 @@ def get_stats():
 def health_check():
     """Health check endpoint"""
     return jsonify({'status': 'healthy', 'timestamp': time.time()})
-
-
-@app.route('/api/simulation/status', methods=['GET'])
-def get_simulation_status():
-    """Get current simulation mode status"""
-    return jsonify({
-        'simulation_mode': False,  # We'll connect this later
-        'status': 'active',
-        'message': 'System is collecting real data with fallbacks'
-    })
-
-
-@app.route('/api/simulation/toggle', methods=['POST'])
-def toggle_simulation():
-    """Toggle between simulation and normal mode"""
-    data = request.get_json(force=True)
-    new_mode = data.get('enabled', False)
-    
-    return jsonify({
-        'simulation_mode': new_mode,
-        'message': f'Switched to {"simulation" if new_mode else "normal"} mode',
-        'success': True
-    })
 
 
 if __name__ == '__main__':
