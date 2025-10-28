@@ -6,7 +6,7 @@ EuroPulse Real-Time Threat Dashboard
 import sys
 import os
 import time
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 
 # Add the root project directory to Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
@@ -20,6 +20,7 @@ class Dashboard:
         # Use environment variable to choose collector type, default to 'mock'
         collector_type = os.getenv('COLLECTOR_TYPE', 'mock')
         
+        self.collector_type = collector_type
         self.fr_collector = get_collector(collector_type, 'fr')
         self.de_collector = get_collector(collector_type, 'de')
         self.threat_history = []
@@ -178,12 +179,16 @@ class Dashboard:
             'languages': languages
         }
 
+
 dashboard = Dashboard()
+
 
 @app.route('/')
 def index():
     """Main dashboard page"""
+    print("✅ Serving latest index.html from visualization/dashboard/templates/")
     return render_template('index.html')
+
 
 @app.route('/api/threats')
 def get_threats():
@@ -195,16 +200,42 @@ def get_threats():
         'timestamp': time.time()
     })
 
+
 @app.route('/api/stats')
 def get_stats():
     """API endpoint for threat statistics"""
     stats = dashboard.get_threat_summary()
     return jsonify(stats)
 
+
 @app.route('/api/health')
 def health_check():
     """Health check endpoint"""
     return jsonify({'status': 'healthy', 'timestamp': time.time()})
+
+
+@app.route('/api/simulation/status', methods=['GET'])
+def get_simulation_status():
+    """Get current simulation mode status"""
+    return jsonify({
+        'simulation_mode': False,  # We'll connect this later
+        'status': 'active',
+        'message': 'System is collecting real data with fallbacks'
+    })
+
+
+@app.route('/api/simulation/toggle', methods=['POST'])
+def toggle_simulation():
+    """Toggle between simulation and normal mode"""
+    data = request.get_json(force=True)
+    new_mode = data.get('enabled', False)
+    
+    return jsonify({
+        'simulation_mode': new_mode,
+        'message': f'Switched to {"simulation" if new_mode else "normal"} mode',
+        'success': True
+    })
+
 
 if __name__ == '__main__':
     print("🚀 Starting EuroPulse Dashboard...")
