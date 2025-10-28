@@ -32,6 +32,7 @@ Switch modes instantly via the dashboard buttons, or set the default mode in you
 ```bash
 # Operation mode
 COLLECTOR_TYPE=simulation
+```
 
 
 ## 🎯 Target Threats
