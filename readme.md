@@ -1,14 +1,38 @@
-# EuroPulse: Real-time Physical Threat Detection
+# EuroPulse: Real-Time Physical Threat Detection
 
-Detect emerging physical threats and dangerous events in French and German-speaking social media in real-time. Designed for intelligence analysis and emergency response monitoring.
+EuroPulse detects emerging **physical threats and dangerous events** in French- and German-language social media in real time.  
+It is designed for **intelligence analysis**, **emergency response monitoring**, and **early warning of violent or disruptive incidents**.
+
+---
 
 ## 🚨 Project Focus
 
-- **Threat Detection**: Shootings, explosions, vehicle attacks, riots, stabbings
-- **Languages**: French & German content
-- **Real-time** detection without sentiment reliance
-- **Police/emergency response** relevance
-- **Intelligence analysis** for fast-moving dangerous events
+- **Weak-Signal Detection** – identifies small clusters of early posts before official reports appear  
+- **Threat Categories** – shootings, explosions, stabbings, riots, vehicle attacks  
+- **Languages** – French 🇫🇷 and German 🇩🇪  
+- **Real-Time Analysis** – updates every few seconds  
+- **Operational Context** – police, emergency services, and intelligence analysis
+
+---
+
+## 🧠 Operating Modes
+
+EuroPulse can switch between live data sources directly from the dashboard.
+
+| Mode | Source | Description |
+|------|---------|-------------|
+| 🧠 **Simulation** | Mock data generator | Safe demo / offline mode with synthetic incidents |
+| 🧵 **Reddit** | Reddit API | Monitors French and German posts mentioning threat indicators |
+| 🐘 **Mastodon** | Public Mastodon timelines | Uses Weak Signal Detector to flag early posts about physical events |
+| 💬 **Bluesky** | (in development) | Will track early public safety signals from Bluesky |
+| 🌍 **Aggregate** | Combined | Merges Reddit + Mastodon (+ Bluesky) for maximum coverage |
+
+Switch modes instantly via the dashboard buttons, or set the default mode in your `.env`:
+
+```bash
+# Operation mode
+COLLECTOR_TYPE=simulation
+
 
 ## 🎯 Target Threats
 
@@ -56,10 +80,11 @@ python test_threat_collector.py
 ## 🔧 Tech Stack
 
 - Python 3.8+
-- Hugging Face Transformers (multilingual)
+- Flask dashboard (real-time web UI)
+- Hugging Face Transformers for multilingual NLP
+- Weak Signal Detector (custom algorithm)
 - HDBSCAN clustering for threat grouping
-- Real-time streaming analysis
-- Twitter/Reddit APIs for live data
+- Reddit / Mastodon / Bluesky APIs for live collection
 
 ## 🛡️ Use Cases
 
