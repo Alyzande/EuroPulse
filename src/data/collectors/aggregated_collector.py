@@ -31,23 +31,24 @@ class AggregatedCollector:
             "bluesky": self.bluesky_collector,
         }
 
-        # Try all real sources
         for platform_name, collector in sources.items():
             try:
                 posts = collector.collect_recent_posts(limit)
+                if not posts:
+                    print(f"ℹ️ {platform_name.capitalize()} returned 0 posts.")
+                    continue
+
                 for p in posts:
-                    # Ensure every post has a consistent platform marker
-                    if not p.get("platform"):
-                        p["platform"] = platform_name
-                    else:
-                        p["platform"] = p["platform"].lower().strip()
+                    p["platform"] = p.get("platform", platform_name).lower().strip()
                     p["source_verified"] = True
+
                 print(f"✅ {platform_name.capitalize()}: {len(posts)} posts")
                 all_posts.extend(posts)
+
             except Exception as e:
                 print(f"⚠️ {platform_name.capitalize()} failed: {e}")
 
-        # Fallback to mock if nothing was fetched
+        # ✅ NEW: return partial results even if one or more collectors failed
         if not all_posts:
             print("⚠️ No data collected — falling back to mock feed.")
             mock = MockCollector(self.language)
@@ -55,12 +56,9 @@ class AggregatedCollector:
             for p in all_posts:
                 p["platform"] = "mock"
                 p["source_verified"] = False
+        else:
+            print(f"✅ Aggregator collected {len(all_posts)} total posts from working sources.")
 
         # Sort newest first
         all_posts.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
-
-        print(
-            f"🧩 Aggregated total: {len(all_posts)} posts "
-            f"from {len([s for s in sources if sources[s]])} sources."
-        )
         return all_posts

@@ -2,11 +2,7 @@
 """
 Bluesky Collector - Weak Signal Detector
 ----------------------------------------
-Collects French and German posts from Bluesky's public timeline or search API,
-applies lightweight weak-signal detection using THREAT_KEYWORDS
-and URGENCY_INDICATORS to identify early signs of physical threats.
-
-Outputs posts in the same schema as other collectors.
+Non-blocking version with safe 5-minute rate-limit cooldown.
 """
 
 import os
@@ -18,12 +14,11 @@ from collections import defaultdict, deque
 from src.data.threat_keywords import THREAT_KEYWORDS, URGENCY_INDICATORS
 
 
-
 class BlueskyCollector:
-    """
-    Weak-signal Bluesky collector that polls for French and German posts
-    and detects early threat signals.
-    """
+    """Weak-signal Bluesky collector that polls for French and German posts safely."""
+
+    last_rate_limit = 0  # shared timestamp of last 429 hit
+    cooldown_seconds = 300  # 5 minutes
 
     def __init__(self, language="fr", limit=20):
         self.language = language
@@ -36,21 +31,30 @@ class BlueskyCollector:
         # Weak-signal burst detection
         self.recent_mentions = defaultdict(lambda: deque(maxlen=50))
         self.window_seconds = 120  # 2-minute window
-
-        # Compile regex for cleaning
         self.clean_re = re.compile(r"<[^>]+>")
 
         print(f"✅ BlueskyCollector initialized for language={language}")
         self._authenticate()
 
     # ------------------------------------------------------------------
-    # Authentication
-    # ------------------------------------------------------------------
     def _authenticate(self):
-        """Authenticate with Bluesky API and get a session token"""
+        """Authenticate with Bluesky API and get a session token."""
+        if time.time() - BlueskyCollector.last_rate_limit < self.cooldown_seconds:
+            remaining = int(self.cooldown_seconds - (time.time() - BlueskyCollector.last_rate_limit))
+            print(f"⏭️ Skipping Bluesky authentication (cooldown {remaining}s left).")
+            return
+
         try:
             payload = {"identifier": self.username, "password": self.password}
-            r = requests.post(f"{self.api_url}/xrpc/com.atproto.server.createSession", json=payload)
+            r = requests.post(
+                f"{self.api_url}/xrpc/com.atproto.server.createSession",
+                json=payload,
+                timeout=10,
+            )
+            if r.status_code == 429:
+                print("⚠️ Bluesky rate limit hit — skipping for 5 minutes.")
+                BlueskyCollector.last_rate_limit = time.time()
+                return
             r.raise_for_status()
             data = r.json()
             self.jwt_token = data.get("accessJwt")
@@ -63,15 +67,12 @@ class BlueskyCollector:
         return {"Authorization": f"Bearer {self.jwt_token}"} if self.jwt_token else {}
 
     # ------------------------------------------------------------------
-    # Text processing helpers
-    # ------------------------------------------------------------------
     def _clean_text(self, text: str) -> str:
-        text = re.sub(r"http\S+", "", text)  # remove URLs
+        text = re.sub(r"http\S+", "", text)
         text = self.clean_re.sub("", text)
         return text.strip()
 
     def _compute_signal_score(self, text: str) -> float:
-        """Score post using THREAT_KEYWORDS and URGENCY_INDICATORS"""
         lang = self.language
         score = 0
         text_lower = text.lower()
@@ -83,30 +84,32 @@ class BlueskyCollector:
 
         if any(u in text_lower for u in URGENCY_INDICATORS.get(lang, [])):
             score *= 1.5
-
         if any(c in text for c in ["!", "💥", "🚨", "🔥", "😱", "💣"]):
             score += 2
-
         return round(score, 2)
 
     def _extract_location_tokens(self, text: str):
-        """Extract capitalized words (possible locations)"""
         words = re.findall(r"\b[A-ZÉÈÎÄÖÜ][a-zéèêàäöüß\-]{3,}\b", text)
         return [w for w in words if len(w) > 3]
 
     # ------------------------------------------------------------------
-    # Main collection logic
-    # ------------------------------------------------------------------
     def collect_recent_posts(self, limit=None):
-        """Collect recent Bluesky posts via app.bsky.feed.searchPosts"""
+        """Collect recent Bluesky posts safely (non-blocking)."""
+        if time.time() - BlueskyCollector.last_rate_limit < self.cooldown_seconds:
+            remaining = int(self.cooldown_seconds - (time.time() - BlueskyCollector.last_rate_limit))
+            print(f"⏭️ Skipping Bluesky collection (cooldown {remaining}s left).")
+            return []
+
         if not self.jwt_token:
             self._authenticate()
+        if not self.jwt_token:
+            print("⚠️ No valid Bluesky token — skipping fetch.")
+            return []
 
         collected = []
         now = time.time()
         limit = limit or self.limit
 
-        # Use language-based search keywords
         query = "attaque OR explosion OR fusillade OR verletzung OR bombe OR riot"
         params = {"q": query, "limit": limit}
 
@@ -117,6 +120,10 @@ class BlueskyCollector:
                 params=params,
                 timeout=10,
             )
+            if r.status_code == 429:
+                print("⚠️ Bluesky rate limit hit during fetch — skipping for 5 minutes.")
+                BlueskyCollector.last_rate_limit = time.time()
+                return []
             r.raise_for_status()
             posts = r.json().get("posts", [])
         except Exception as e:
@@ -126,13 +133,12 @@ class BlueskyCollector:
         for p in posts:
             record = p.get("record", {})
             text = self._clean_text(record.get("text", ""))
-            lang_detected = self.language in text.lower()  # rough heuristic
-            if not text or not lang_detected:
+            if not text:
                 continue
 
             score = self._compute_signal_score(text)
             if score < 5:
-                continue  # weak signal
+                continue
 
             tokens = self._extract_location_tokens(text)
             for t in tokens:
@@ -171,8 +177,6 @@ class BlueskyCollector:
         print(f"📡 Collected {len(collected)} Bluesky posts for lang={self.language}")
         return collected[:limit]
 
-    # ------------------------------------------------------------------
-    # Classification helpers
     # ------------------------------------------------------------------
     def _risk_level_from_score(self, score: float) -> str:
         if score >= 10:
