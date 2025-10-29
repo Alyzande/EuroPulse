@@ -22,10 +22,11 @@ EuroPulse can switch between live data sources directly from the dashboard.
 | Mode | Source | Description |
 |------|---------|-------------|
 | 🧠 **Simulation** | Mock data generator | Safe demo / offline mode with synthetic incidents |
-| 🧵 **Reddit** | Reddit API | Monitors French and German posts mentioning threat indicators |
-| 🐘 **Mastodon** | Public Mastodon timelines | Uses Weak Signal Detector to flag early posts about physical events |
-| 💬 **Bluesky** | (in development) | Will track early public safety signals from Bluesky |
-| 🌍 **Aggregate** | Combined | Merges Reddit + Mastodon (+ Bluesky) for maximum coverage |
+| 🧵 **Reddit** | Reddit API | Monitors French and German posts mentioning possible threat indicators |
+| 🐘 **Mastodon** | Public Mastodon timelines | Detects weak signals in early eyewitness or local reports |
+| 💬 **Bluesky** | Bluesky public feed | Live collector with built-in rate-limit handling (temporarily throttled if API is busy) |
+| 🌍 **Aggregate** | Combined | Merges Reddit + Mastodon (+ Bluesky when available) for maximum coverage |
+
 
 Switch modes instantly via the dashboard buttons, or set the default mode in your `.env`:
 
