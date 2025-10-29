@@ -1,5 +1,6 @@
 """
-Aggregates data from multiple sources
+Aggregates data from multiple sources (Reddit, Mastodon, Bluesky)
+and normalizes platform information for each post.
 """
 
 from typing import List, Dict, Any
@@ -10,60 +11,56 @@ from .mock_collector import MockCollector
 
 
 class AggregatedCollector:
-    """Combines data from multiple real sources"""
+    """Combines and normalizes threat intelligence data from multiple collectors."""
 
-    def __init__(self, language: str = 'fr'):
+    def __init__(self, language: str = "fr"):
         self.language = language
         self.reddit_collector = RedditCollector(language)
         self.mastodon_collector = MastodonCollector(language)
         self.bluesky_collector = BlueskyCollector(language)
         print(f"🌍 AggregatedCollector initialized for language={language}")
 
+    # ------------------------------------------------------------------
     def collect_recent_posts(self, limit: int = 30) -> List[Dict[str, Any]]:
-        """Collect from all available sources and merge them"""
+        """Collect posts from all active sources and merge results."""
 
-        all_posts = []
+        all_posts: List[Dict[str, Any]] = []
+        sources = {
+            "reddit": self.reddit_collector,
+            "mastodon": self.mastodon_collector,
+            "bluesky": self.bluesky_collector,
+        }
 
-        # Try Reddit
-        try:
-            reddit_posts = self.reddit_collector.collect_recent_posts(limit)
-            for p in reddit_posts:
-                p["platform"] = p.get("platform", "reddit")
-            print(f"✅ Reddit: {len(reddit_posts)} posts")
-            all_posts.extend(reddit_posts)
-        except Exception as e:
-            print(f"⚠️ Reddit failed: {e}")
+        # Try all real sources
+        for platform_name, collector in sources.items():
+            try:
+                posts = collector.collect_recent_posts(limit)
+                for p in posts:
+                    # Ensure every post has a consistent platform marker
+                    if not p.get("platform"):
+                        p["platform"] = platform_name
+                    else:
+                        p["platform"] = p["platform"].lower().strip()
+                    p["source_verified"] = True
+                print(f"✅ {platform_name.capitalize()}: {len(posts)} posts")
+                all_posts.extend(posts)
+            except Exception as e:
+                print(f"⚠️ {platform_name.capitalize()} failed: {e}")
 
-        # Try Mastodon
-        try:
-            mastodon_posts = self.mastodon_collector.collect_recent_posts(limit)
-            for p in mastodon_posts:
-                p["platform"] = p.get("platform", "mastodon")
-            print(f"✅ Mastodon: {len(mastodon_posts)} posts")
-            all_posts.extend(mastodon_posts)
-        except Exception as e:
-            print(f"⚠️ Mastodon failed: {e}")
-
-        # Try Bluesky
-        try:
-            bluesky_posts = self.bluesky_collector.collect_recent_posts(limit)
-            for p in bluesky_posts:
-                p["platform"] = p.get("platform", "bluesky")
-            print(f"✅ Bluesky: {len(bluesky_posts)} posts")
-            all_posts.extend(bluesky_posts)
-        except Exception as e:
-            print(f"⚠️ Bluesky failed: {e}")
-
-        # Fallback if nothing fetched
+        # Fallback to mock if nothing was fetched
         if not all_posts:
-            print("⚠️ No data collected — falling back to mock.")
+            print("⚠️ No data collected — falling back to mock feed.")
             mock = MockCollector(self.language)
             all_posts = mock.collect_recent_posts(limit)
             for p in all_posts:
                 p["platform"] = "mock"
+                p["source_verified"] = False
 
-        # Optional: sort by timestamp (newest first)
+        # Sort newest first
         all_posts.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
 
-        print(f"🧩 Aggregated total: {len(all_posts)} posts from multiple sources.")
+        print(
+            f"🧩 Aggregated total: {len(all_posts)} posts "
+            f"from {len([s for s in sources if sources[s]])} sources."
+        )
         return all_posts

@@ -17,7 +17,8 @@ from collections import defaultdict, deque
 from datetime import datetime, timezone
 from urllib.parse import urljoin
 
-from src.processing.threat_keywords import THREAT_KEYWORDS, URGENCY_INDICATORS
+from src.data.threat_keywords import THREAT_KEYWORDS, URGENCY_INDICATORS
+
 
 
 class MastodonCollector:

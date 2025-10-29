@@ -15,7 +15,8 @@ import requests
 import re
 from datetime import datetime, timezone
 from collections import defaultdict, deque
-from src.processing.threat_keywords import THREAT_KEYWORDS, URGENCY_INDICATORS
+from src.data.threat_keywords import THREAT_KEYWORDS, URGENCY_INDICATORS
+
 
 
 class BlueskyCollector:
