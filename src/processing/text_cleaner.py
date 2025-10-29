@@ -4,7 +4,6 @@ Cleans French and German text for threat detection
 """
 
 import re
-import string
 import os
 
 
@@ -13,11 +12,10 @@ class TextCleaner:
 
     def __init__(self, language: str = 'fr'):
         self.language = language
+        # Debug mode is enabled only if DEBUG_TEXTCLEANER=true in .env
         self.debug = os.getenv("DEBUG_TEXTCLEANER", "false").lower() == "true"
         if self.debug:
             print(f"🧹 Text cleaner initialized for {language} (debug mode)")
-        else:
-            print(f"🧹 Text cleaner initialized for {language}")
 
     def clean_text(self, text: str) -> str:
         """
